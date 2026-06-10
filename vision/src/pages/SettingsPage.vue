@@ -1,5 +1,5 @@
 <script setup>
-import { ref } from "vue";
+import { ref, watch } from "vue";
 import { session } from "../store/session";
 import { auth, updateProfile, signOut, deleteAccount } from "../services/auth";
 import { isTauri } from "../services/db";
@@ -8,6 +8,13 @@ import { Check } from "lucide-vue-next";
 
 const router = useRouter();
 const name = ref(auth.profile?.name || "");
+
+watch(() => auth.profile?.name, (newName) => {
+  if (newName && !name.value) {
+    name.value = newName;
+  }
+});
+
 const saved = ref(false);
 const error = ref("");
 const showDeleteConfirm = ref(false);
