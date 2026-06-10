@@ -1,0 +1,189 @@
+@import "tailwindcss";
+
+:root {
+  --app-ink: #000000;
+  --app-muted: rgba(0, 0, 0, 0.5);
+  --app-line: rgba(0, 0, 0, 0.2);
+  --app-surface: #FFFFFF;
+  --app-canvas: #FFFFFF;
+  --app-accent: #000000;
+}
+
+:root[data-theme="dark"] {
+  --app-ink: #F9F9F9;
+  --app-muted: rgba(255, 255, 255, 0.6);
+  --app-line: rgba(255, 255, 255, 0.15);
+  --app-surface: #1E1E1E;
+  --app-canvas: #121212;
+  --app-accent: #FFFFFF;
+}
+
+@theme {
+  --color-ink: var(--app-ink);
+  --color-muted: var(--app-muted);
+  --color-line: var(--app-line);
+  --color-surface: var(--app-surface);
+  --color-canvas: var(--app-canvas);
+  --color-accent: var(--app-accent);
+  --font-sans: "Inter", system-ui, -apple-system, sans-serif;
+}
+
+html,
+body,
+#app {
+  height: 100%;
+  overflow: hidden;
+}
+
+body {
+  margin: 0;
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Hide scrollbars globally */
+::-webkit-scrollbar {
+  display: none;
+}
+* {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+/* Tailwind v4 ne met plus cursor:pointer sur les boutons par défaut */
+@layer base {
+  button:not(:disabled),
+  [role="button"]:not(:disabled) {
+    cursor: pointer;
+  }
+}
+
+/* Perf galerie : ne pas rendre/décoder les vignettes hors écran */
+.cv-auto {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 320px;
+}
+
+/* ============================================================
+   Onboarding — spotlight tour
+   ============================================================ */
+
+.onboarding-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9997;
+}
+
+/* Tooltip card */
+.onboarding-tooltip {
+  background: var(--color-surface);
+  border: 1px solid var(--color-line);
+  border-radius: 0;
+  padding: 24px;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  width: max-content;
+  max-width: 320px;
+
+  /* Apparition animée */
+  opacity: 0;
+  transform-origin: center;
+  transition:
+    opacity 0.3s ease,
+    transform 0.3s ease;
+}
+
+.onboarding-tooltip--visible {
+  opacity: 1;
+}
+
+/* Title */
+.onboarding-tooltip__title {
+  font-size: 1.25rem;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: -0.05em;
+  color: var(--color-ink);
+  margin: 0 0 8px;
+}
+
+/* Description */
+.onboarding-tooltip__desc {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--color-muted);
+  line-height: 1.5;
+  margin: 0;
+}
+
+/* Footer */
+.onboarding-tooltip__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 18px;
+  gap: 12px;
+}
+
+/* Progress dots */
+.onboarding-tooltip__dots {
+  display: flex;
+  gap: 5px;
+}
+
+.onboarding-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-line);
+  transition: background 0.2s ease, transform 0.2s ease;
+}
+
+.onboarding-dot--active {
+  background: var(--color-ink);
+  transform: scale(1.2);
+}
+
+/* Action buttons */
+.onboarding-tooltip__actions {
+  display: flex;
+  gap: 6px;
+}
+
+.onboarding-btn {
+  border: 1px solid transparent;
+  border-radius: 0;
+  padding: 8px 16px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  font-family: inherit;
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease,
+    opacity 0.15s ease;
+}
+
+.onboarding-btn--primary {
+  background: var(--color-accent);
+  color: var(--color-canvas);
+}
+
+.onboarding-btn--primary:hover {
+  opacity: 0.88;
+}
+
+.onboarding-btn--ghost {
+  background: transparent;
+  color: var(--color-ink);
+  border-color: var(--color-line);
+}
+
+.onboarding-btn--ghost:hover {
+  background: var(--color-canvas);
+  color: var(--color-ink);
+}
