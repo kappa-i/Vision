@@ -4,7 +4,7 @@ import * as sync from "../services/sync";
 import { auth } from "../services/auth";
 import { toast } from "./toast";
 import { pickImage, generateThumb } from "../services/files";
-import { uploadToR2 } from "../services/r2";
+import { uploadToR2, deleteFromR2, deleteFolderFromR2 } from "../services/r2";
 
 /**
  * Liste des projets.
@@ -96,7 +96,19 @@ export function findProject(id) {
 }
 
 export async function removeProject(id) {
+  const p = findProject(id);
+  const coverPath = p?.cover_path;
+
   state.items = state.items.filter((p) => String(p.id) !== String(id));
+
+  // Supprimer la couverture de Cloudflare
+  if (coverPath && coverPath.startsWith("http")) {
+    deleteFromR2(coverPath);
+  }
+
+  // Supprimer tout le dossier du projet de Cloudflare
+  deleteFolderFromR2(`project_${id}/`);
+
   if (auth.user || !db.isTauri()) {
     try { await sync.syncDeleteProject(id); } catch (e) { console.warn(e.message); }
   }

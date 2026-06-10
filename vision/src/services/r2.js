@@ -1,5 +1,5 @@
 import { readFile } from "@tauri-apps/plugin-fs";
-import { S3Client, PutObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
+import { S3Client, PutObjectCommand, DeleteObjectCommand, ListObjectsV2Command } from "@aws-sdk/client-s3";
 import { basename } from "./files";
 
 const endpoint = import.meta.env.VITE_R2_ENDPOINT;
@@ -84,6 +84,23 @@ export async function deleteFromR2(url) {
     return true;
   } catch (error) {
     console.error("Erreur suppression R2:", error);
+    return false;
+  }
+}
+
+export async function deleteFolderFromR2(folderPrefix) {
+  if (!s3 || !folderPrefix) return false;
+  try {
+    const listCmd = new ListObjectsV2Command({ Bucket: bucket, Prefix: folderPrefix });
+    const listRes = await s3.send(listCmd);
+    if (!listRes.Contents || listRes.Contents.length === 0) return true;
+
+    for (const item of listRes.Contents) {
+      await s3.send(new DeleteObjectCommand({ Bucket: bucket, Key: item.Key }));
+    }
+    return true;
+  } catch (e) {
+    console.error("Erreur suppression dossier R2:", e);
     return false;
   }
 }
