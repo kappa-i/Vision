@@ -13,7 +13,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        platform: [macos-latest, windows-latest]
+        include:
+          - platform: macos-latest
+            args: '--target universal-apple-darwin'
+          - platform: windows-latest
+            args: ''
 
     runs-on: ${{ matrix.platform }}
     steps:
@@ -27,6 +31,8 @@ jobs:
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
 
       - name: Install dependencies (Ubuntu only)
         if: matrix.platform == 'ubuntu-22.04'
@@ -52,10 +58,32 @@ jobs:
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Signature/notarisation Apple : ignorés tant que les secrets ne sont pas définis.
+          # À configurer avec un compte Apple Developer pour supprimer l'avertissement Gatekeeper.
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         with:
           projectPath: ./vision
+          args: ${{ matrix.args }}
           tagName: app-v__VERSION__
           releaseName: 'Vision App v__VERSION__'
-          releaseBody: 'Voir les fichiers ci-dessous pour l"installation.'
+          releaseBody: |
+            ## Installation
+
+            ### Windows
+            Télécharger et lancer le fichier `.exe` ou `.msi`.
+
+            ### macOS
+            1. Télécharger le fichier `.dmg` ci-dessous.
+            2. Ouvrir le DMG et glisser **vision** dans le dossier **Applications**.
+            3. L'app n'étant pas encore notarisée par Apple, macOS affichera « vision est endommagé ». Pour débloquer, ouvrir le **Terminal** et coller :
+               ```
+               xattr -d com.apple.quarantine /Applications/vision.app
+               ```
+            4. Lancer l'app depuis le dossier Applications.
           releaseDraft: true
           prerelease: false
