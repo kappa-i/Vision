@@ -1,5 +1,5 @@
 import { open, save } from "@tauri-apps/plugin-dialog";
-import { copyFile } from "@tauri-apps/plugin-fs";
+import { copyFile, writeFile } from "@tauri-apps/plugin-fs";
 import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 import { isTauri } from "./db";
 
@@ -51,6 +51,22 @@ export function basename(path) {
   return path.split(/[\\/]/).pop();
 }
 
+/**
+ * Enregistre une source vers un chemin local.
+ * Les médias synchronisés sont des URLs R2 (https) : on les télécharge ;
+ * les chemins locaux (machine du créatif) sont copiés directement.
+ */
+async function saveSource(src, destination) {
+  if (/^https?:\/\//.test(src)) {
+    const res = await fetch(src);
+    if (!res.ok) throw new Error(`Téléchargement échoué (HTTP ${res.status})`);
+    const bytes = new Uint8Array(await res.arrayBuffer());
+    await writeFile(destination, bytes);
+  } else {
+    await copyFile(src, destination);
+  }
+}
+
 /** Télécharge tous les fichiers vers un dossier choisi. Renvoie { dir, count } ou null. */
 export async function downloadAll(paths) {
   if (!isTauri() || !paths.length) return null;
@@ -59,10 +75,10 @@ export async function downloadAll(paths) {
   let count = 0;
   for (const src of paths) {
     try {
-      await copyFile(src, `${dir}/${basename(src)}`);
+      await saveSource(src, `${dir}/${basename(src).split("?")[0]}`);
       count++;
-    } catch {
-      /* ignore les échecs individuels */
+    } catch (e) {
+      console.error("Échec téléchargement:", src, e);
     }
   }
   return { dir, count };
@@ -97,8 +113,8 @@ export function isImagePath(path) {
  */
 export async function downloadFile(srcPath) {
   if (!isTauri()) return null;
-  const destination = await save({ defaultPath: basename(srcPath) });
+  const destination = await save({ defaultPath: basename(srcPath).split("?")[0] });
   if (!destination) return null;
-  await copyFile(srcPath, destination);
+  await saveSource(srcPath, destination);
   return destination;
 }

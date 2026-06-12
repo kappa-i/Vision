@@ -1,48 +1,74 @@
 # Vision — TODO
 
-Liste des évolutions, court et long terme. Voir aussi la réflexion produit :
+Roadmap issue de l'audit du 2026-06-12. Voir aussi la réflexion produit :
 [`docs/fonctionnement.md`](docs/fonctionnement.md).
 
-> 💡 La quasi-totalité du long terme se débloque avec une seule fondation : le
-> **backend (Supabase)**. Le court terme est faisable dès maintenant, sans backend.
+> ⚠️ Hors périmètre (décision produit) : paiement intégré / quotas de sélection
+> payants. Vision est un outil de **collaboration**, pas de monétisation.
+> Pas d'app mobile non plus — le « client en mobilité » sera couvert par le
+> client web responsive.
 
 ---
 
-## 🟢 Court terme — UX & finition (sans backend)
+## 🔴 Phase 0 — Sécurité (avant toute distribution)
 
-- [x] Validation en masse depuis la grille (approuver/refuser sans ouvrir chaque photo) + bouton « Tout approuver »
-- [x] Tri & recherche (galerie : tri récent/ancien/nom · projets : recherche par nom)
-- [x] « Tout télécharger » à la livraison (copie vers un dossier choisi)
-- [x] Favoris client (♥), distinct de la validation
-- [x] Clarifier les 2 zones de commentaires (annotations sur image vs Feedback global)
-- [x] Marquer une annotation comme « résolue »
-- [x] Confirmations sur les suppressions (photo, référence)
-- [x] Erreurs visibles via toasts (fichier non-image ignoré, etc.)
-- [x] Chargement progressif des vignettes (lazy-load)
-- [x] Protection écran désactivée côté créatif (active seulement pour le client)
-- [x] Nettoyer le statut « En attente » (supprimé)
-- [x] Écran vide guidé sur le Dashboard
+> ✅ Déployée et testée de bout en bout le 2026-06-12 (upload, RLS, RPC,
+> invitations, livraison, realtime). Voir `docs/phase0-deploiement.md`.
+
+- [x] Sortir les clés R2 du bundle → Edge Function `r2-sign` + presigned URLs
+- [x] Policies RLS table par table (owner OU membre) — `supabase/phase0.sql`
+- [x] Échecs d'écriture cloud remontés en toast (`syncError`)
+- [x] Codes d'invitation : expiration 72 h, usage unique, RPC `redeem_invite`
+      (table invites non lisible par les clients)
+- [x] CSP définie dans `tauri.conf.json`
+- [x] Déploiement (SQL v2, Edge Function + secrets, CORS bucket, ENV_FILE supprimé)
+- [x] Ancien token R2 révoqué chez Cloudflare + `VITE_R2_*` retirés de `.env.local`
+
+## 🟠 Phase 1 — Réparer le cœur
+
+- [x] **Livraison côté client** : `downloadFile`/`downloadAll` téléchargent
+      les URLs R2 via fetch + `writeFile` (fait en avance le 2026-06-12)
+- [ ] Realtime : gérer les DELETE (média supprimé qui reste affiché chez le
+      client) et les UPDATE de commentaires
+- [ ] Rôle résolu **par projet** partout (plus de défaut global « créatif » ;
+      le client voit « Nouveau projet » sur le dashboard)
+- [ ] Nettoyage : données seed/picsum, store `stages` mort, orphelins R2
+      (`thumbs/` et `covers/` non purgés à la suppression d'un projet)
+- [ ] `deleteAccount` réel (RPC `delete_user` côté Supabase)
+
+## 🟡 Phase 2 — Protection média (la vraie, remplace l'anti-screenshot seul)
+
+- [ ] À l'upload : aperçu basse-déf **filigrané** (étendre `generate_thumb`
+      en Rust), affiché partout avant la remise
+- [ ] Originaux dans un bucket R2 **privé** ; accès uniquement par URL signée,
+      débloquée à la remise (« release ») — remplace le domaine public actuel
+
+## 🔵 Phase 3 — Client web (zéro installation)
+
+- [ ] Déployer le front Vue sur le web pour les clients (le code est déjà
+      gardé par `isTauri()` presque partout) — supprime les problèmes
+      DMG/Gatekeeper et couvre la consultation sur téléphone (responsive)
+- [ ] Invitation par **lien email** au lieu d'un code (meilleure UX + sécurité)
+
+## 🟣 Phase 4 — Rétention & confort
+
+- [ ] Notifications email (« Marie a ajouté 24 photos à valider ») —
+      Resend + triggers Supabase ; le client ne vit pas dans l'app
+- [ ] Versionnage des retouches (v1/v2/v3 + historique, extension de
+      l'avant/après existant)
+- [ ] Branding du créatif sur l'espace client (logo, couleurs)
+- [ ] Plusieurs clients par projet (couple, équipe marketing)
+- [ ] Téléchargement par format (web 2048px / impression pleine résolution)
+- [ ] Export sélection vers Lightroom (liste des fichiers approuvés)
+
+## ⚪ Fond de panier — UX & finition
+
 - [ ] Sélection multiple par cases à cocher (suppression groupée) — *partiel : bulk « Tout approuver » fait*
 - [ ] Undo (annuler une suppression)
-- [ ] Onboarding 1er lancement (visite guidée)
 - [ ] Multi-langue (i18n)
-
----
-
-## 🔵 Long terme — structurel & stratégique
-
-- [x] Vraie identité / auth → supprimer le sélecteur de rôle (Supabase Auth)
-- [ ] Invitation par lien (email) au lieu d'un code
-- [x] Synchronisation cloud (2 machines voient le même projet — Supabase + Realtime)
-- [ ] Client sur le web (zéro installation)
-- [ ] Notifications email / push
-- [x] Stockage médias cloud + sauvegarde (Cloudflare R2)
-- [ ] Protection image solide (aperçus basse-déf + filigrane + liens signés)
-- [ ] Versionnage des livrables / historique des révisions
-- [ ] Formats & résolutions de livraison définissables
-- [ ] Modèle économique (abonnement créatif, client gratuit)
 - [ ] Performance sur gros volumes (centaines de photos)
-- [ ] Mobile / responsive
+- [ ] Modèle économique (abonnement créatif, client gratuit) — sans paiement
+      in-app ni quotas
 
 ---
 
@@ -57,6 +83,13 @@ Liste des évolutions, court et long terme. Voir aussi la réflexion produit :
 - [x] Validation par photo → décision globale + livraison alignées
 - [x] Feedback centralisé
 - [x] Livraison (verrouillée jusqu'à remise par le créatif)
-- [x] Invitation client (code local)
+- [x] Vraie identité / auth (Supabase Auth, plus de sélecteur de rôle)
+- [x] Synchronisation cloud (Supabase + Realtime)
+- [x] Stockage médias cloud (Cloudflare R2) — *à sécuriser, cf. Phase 0*
+- [x] Invitation client par code
 - [x] Non-lus (pastilles locales, par rôle)
 - [x] Protections desktop (clic droit off, capture d'écran noire)
+- [x] Onboarding 1er lancement (visite guidée)
+- [x] Validation en masse, tri & recherche, favoris ♥, annotations résolues,
+      confirmations, toasts, lazy-load, écran vide guidé
+- [x] Distribution : releases GitHub Actions (Windows + macOS universel)

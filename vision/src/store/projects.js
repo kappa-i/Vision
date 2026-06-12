@@ -2,7 +2,7 @@ import { reactive } from "vue";
 import * as db from "../services/db";
 import * as sync from "../services/sync";
 import { auth } from "../services/auth";
-import { toast } from "./toast";
+import { toast, syncError } from "./toast";
 import { pickImage, generateThumb } from "../services/files";
 import { uploadToR2, deleteFromR2, deleteFolderFromR2 } from "../services/r2";
 
@@ -101,25 +101,44 @@ export async function removeProject(id) {
 
   state.items = state.items.filter((p) => String(p.id) !== String(id));
 
-  // Supprimer la couverture de Cloudflare
-  if (coverPath && coverPath.startsWith("http")) {
-    deleteFromR2(coverPath);
+  // Purger R2 AVANT de supprimer la ligne projet : l'Edge Function vérifie
+  // que le projet nous appartient encore (sinon → 403).
+  if (auth.user) {
+    await deleteFolderFromR2(`project_${id}/`);
+    // Couverture héritée hors préfixe projet (anciens uploads dans covers/)
+    if (coverPath && coverPath.startsWith("http") && !coverPath.includes(`project_${id}/`)) {
+      await deleteFromR2(coverPath);
+    }
   }
-
-  // Supprimer tout le dossier du projet de Cloudflare
-  deleteFolderFromR2(`project_${id}/`);
 
   if (auth.user || !db.isTauri()) {
-    try { await sync.syncDeleteProject(id); } catch (e) { console.warn(e.message); }
+    try { await sync.syncDeleteProject(id); } catch (e) { syncError(e, "Suppression du projet"); }
   }
   if (db.isTauri()) await db.deleteProject(id);
+}
+
+/**
+ * Quitter un projet (client) : retire sa propre ligne project_members.
+ * Le projet original du créatif n'est PAS supprimé.
+ */
+export async function leaveProject(id) {
+  state.items = state.items.filter((p) => String(p.id) !== String(id));
+  if (auth.user) {
+    try {
+      await sync.syncLeaveProject(id, auth.user.id);
+      toast("Vous avez quitté le projet.", "success");
+    } catch (e) {
+      syncError(e, "Sortie du projet");
+    }
+  }
 }
 
 export async function updateProjectStatus(id, status) {
   const p = findProject(id);
   if (p) p.status = status;
   if (auth.user || !db.isTauri()) {
-    try { await sync.syncUpdateProject(id, { status }); } catch (e) { console.warn(e.message); }
+    // RPC : seul moyen pour le client de changer le statut (RLS owner-only sur le reste)
+    try { await sync.syncSetProjectStatus(id, status); } catch (e) { syncError(e, "Changement de statut"); }
   }
   if (db.isTauri()) await db.setProjectStatus(id, status);
 }
@@ -134,7 +153,7 @@ export async function updateProjectMeta(id, name, description) {
   if (auth.user || !db.isTauri()) {
     try {
       await sync.syncUpdateProject(id, { name: trimmed || p?.name, description });
-    } catch (e) { console.warn(e.message); }
+    } catch (e) { syncError(e, "Modification du projet"); }
   }
   if (db.isTauri()) await db.updateProjectMeta(id, trimmed || p?.name, description);
 }
@@ -167,7 +186,7 @@ export async function setCover(id) {
     // 4. Si connecté, on upload vers Cloudflare R2
     if (auth.user) {
       toast("Envoi vers le cloud...", "info");
-      const cloudUrl = await uploadToR2(thumbPath, "covers");
+      const cloudUrl = await uploadToR2(thumbPath, `project_${id}/covers`);
       
       // 5. Mise à jour Supabase via syncUpdateProject (avec try/catch interne pour ignorer RLS)
       const finalPath = cloudUrl || thumbPath; 

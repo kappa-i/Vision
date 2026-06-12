@@ -22,15 +22,17 @@ onMounted(() => {
   loadValidations(projectId.value);
   loadMedia(projectId.value, "gallery");
 
-  gsap.from(".val-card", {
-    autoAlpha: 0,
-    y: 20,
-    duration: 0.45,
-    stagger: 0.07,
-    ease: "power3.out",
-    clearProps: "all",
-    delay: 0.05,
-  });
+  if (document.querySelector(".val-card")) {
+    gsap.from(".val-card", {
+      autoAlpha: 0,
+      y: 20,
+      duration: 0.45,
+      stagger: 0.07,
+      ease: "power3.out",
+      clearProps: "all",
+      delay: 0.05,
+    });
+  }
 });
 
 const decision = computed(() => currentDecision(projectId.value));

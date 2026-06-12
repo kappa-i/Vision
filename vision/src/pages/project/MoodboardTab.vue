@@ -17,6 +17,7 @@ import {
 } from "../../store/media";
 import { pickImages } from "../../services/files";
 import { assetUrl } from "../../services/files";
+import { confirmDialog } from "../../services/dialogs";
 import { can } from "../../store/session";
 import Lightbox from "../../components/Lightbox.vue";
 import { useFileDrop } from "../../composables/useFileDrop";
@@ -288,8 +289,8 @@ function submitFolder() {
   closeFolderModal();
 }
 
-function removeFolder(name) {
-  if (window.confirm(`Supprimer le dossier "${name}" ? Les images retourneront dans "Général".`)) {
+async function removeFolder(name) {
+  if (await confirmDialog(`Supprimer le dossier « ${name} » ? Les images retourneront dans « Général ».`, { title: "Supprimer le dossier", confirmLabel: "Supprimer" })) {
     explicitAlbums.value = explicitAlbums.value.filter(a => a !== name);
     // Move items to general
     for (const m of items.value) {
@@ -367,8 +368,8 @@ async function add(album = null) {
   }
 }
 
-function confirmRemove(m) {
-  if (window.confirm(`Retirer « ${m.title} » ?`)) {
+async function confirmRemove(m) {
+  if (await confirmDialog(`Retirer « ${m.title} » ?`, { title: "Retirer la référence", confirmLabel: "Retirer" })) {
     removeMedia(projectId.value, KIND, m);
   }
 }

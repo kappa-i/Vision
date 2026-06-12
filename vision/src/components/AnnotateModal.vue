@@ -11,6 +11,7 @@ import {
 import { setApproval, setAlbum } from "../store/media";
 import { session, can, ROLES } from "../store/session";
 import { assetUrl } from "../services/files";
+import { confirmDialog } from "../services/dialogs";
 import { acquireScreenGuard, releaseScreenGuard } from "../services/screenGuard";
 import { X, Check, RotateCcw, MapPin, Send, Lightbulb } from "lucide-vue-next";
 
@@ -83,14 +84,14 @@ async function send() {
   pendingPin.value = null;
 }
 
-function deletePin(p) {
-  if (window.confirm("Supprimer cette annotation ?")) {
+async function deletePin(p) {
+  if (await confirmDialog("Supprimer cette annotation ?", { title: "Supprimer l'annotation", confirmLabel: "Supprimer" })) {
     removeImageComment(props.media.id, p.id);
   }
 }
 
-function confirmDelete(c) {
-  if (window.confirm("Supprimer ce commentaire ?")) {
+async function confirmDelete(c) {
+  if (await confirmDialog("Supprimer ce commentaire ?", { title: "Supprimer le commentaire", confirmLabel: "Supprimer" })) {
     removeImageComment(props.media.id, c.id);
   }
 }

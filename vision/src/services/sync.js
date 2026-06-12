@@ -200,38 +200,60 @@ export async function syncCreateInvite(fields) {
   return data;
 }
 
-export async function syncFindInviteByCode(code) {
-  const { data, error } = await supabase
-    .from("invites")
-    .select("*")
-    .eq("code", code)
-    .maybeSingle();
-  if (error) throw error;
-  return data;
-}
-
-export async function syncAcceptInvite(id) {
-  const now = new Date().toISOString();
-  const { error } = await supabase
-    .from("invites")
-    .update({ accepted_at: now })
-    .eq("id", id);
-  if (error) throw error;
-  return now;
-}
-
 export async function syncDeleteInvite(id) {
   const { error } = await supabase.from("invites").delete().eq("id", id);
   if (error) throw error;
 }
 
-// --- Membres projet (join via code) ---
+// --- Membres projet ---
 
-export async function syncAddProjectMember(projectId, userId) {
-  // upsert : tolère les doublons
+/** Quitter un projet (le client supprime sa propre ligne de membre). */
+export async function syncLeaveProject(projectId, userId) {
   const { error } = await supabase
     .from("project_members")
-    .upsert({ project_id: projectId, user_id: userId });
+    .delete()
+    .eq("project_id", projectId)
+    .eq("user_id", userId);
+  if (error) throw error;
+}
+
+// --- RPC sécurisées (SECURITY DEFINER côté Supabase, cf. supabase/phase0.sql) ---
+
+/**
+ * Rachat d'un code d'invitation. La table invites n'est pas lisible par les
+ * clients : la RPC valide (existence, expiration, usage unique) et inscrit
+ * le membre. Renvoie { ok, project_id?, error? }.
+ */
+export async function syncRedeemInvite(code) {
+  const { data, error } = await supabase.rpc("redeem_invite", { p_code: code });
+  if (error) throw error;
+  return data;
+}
+
+/** Changement de statut projet — autorisé owner + membres, statuts whitelistés. */
+export async function syncSetProjectStatus(id, status) {
+  const { error } = await supabase.rpc("set_project_status", {
+    p_project_id: String(id),
+    p_status: status,
+  });
+  if (error) throw error;
+}
+
+/** Approbation d'une photo par le client (ne touche que la colonne approval). */
+export async function syncSetMediaApproval(id, approval) {
+  const { error } = await supabase.rpc("set_media_approval", {
+    p_media_id: String(id),
+    p_approval: approval,
+  });
+  if (error) throw error;
+}
+
+/** Favori ♥ d'une photo (ne touche que la colonne starred). */
+export async function syncSetMediaStarred(id, starred) {
+  const { error } = await supabase.rpc("set_media_starred", {
+    p_media_id: String(id),
+    p_starred: !!starred,
+  });
   if (error) throw error;
 }
 

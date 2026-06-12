@@ -3,6 +3,7 @@ import * as db from "../services/db";
 import * as sync from "../services/sync";
 import { auth } from "../services/auth";
 import { STATUS, updateProjectStatus } from "./projects";
+import { syncError } from "./toast";
 
 /**
  * Validation client — persistée sur Supabase + SQLite local.
@@ -47,7 +48,7 @@ export async function decide(projectId, decision) {
     try {
       const row = await sync.syncCreateValidation(projectId, decision);
       entry.id = row.id;
-    } catch (e) { console.warn(e.message); }
+    } catch (e) { syncError(e, "Validation"); }
   }
   if (!entry.id && db.isTauri()) {
     entry.id = await db.addValidation(projectId, decision);

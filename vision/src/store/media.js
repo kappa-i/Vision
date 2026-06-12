@@ -4,7 +4,7 @@ import * as sync from "../services/sync";
 import { auth } from "../services/auth";
 import { pickImages, pickImage, basename, isImagePath, generateThumb } from "../services/files";
 import { uploadToR2, deleteFromR2 } from "../services/r2";
-import { toast } from "./toast";
+import { toast, syncError } from "./toast";
 
 /**
  * Médias d'un projet — persistés sur Supabase + SQLite local.
@@ -47,21 +47,21 @@ export async function loadMedia(projectId, kind) {
       state.items[k] = rows;
       state.loaded[k] = true;
       // Génère les miniatures manquantes en arrière-plan
-      _generateMissingThumbs(state.items[k]);
+      _generateMissingThumbs(state.items[k], projectId);
       return;
     } catch (e) { console.warn(e.message); }
   }
 
   if (db.isTauri()) {
     state.items[k] = await db.listMedia(projectId, kind);
-    _generateMissingThumbs(state.items[k]);
+    _generateMissingThumbs(state.items[k], projectId);
   } else {
     state.items[k] = [...(seed[k] || [])];
   }
   state.loaded[k] = true;
 }
 
-function _generateMissingThumbs(items) {
+function _generateMissingThumbs(items, projectId) {
   (async () => {
     for (const m of items) {
       if (!m.thumb_path && m.path && !/^https?:\/\//.test(m.path)) {
@@ -73,7 +73,7 @@ function _generateMissingThumbs(items) {
             try { await sync.syncUpdateMedia(m.id, { thumb_path: thumbPath }); } catch {}
           }
           // Upload R2 en arrière-plan
-          uploadToR2(thumbPath, `thumbs`).then(async (remoteUrl) => {
+          uploadToR2(thumbPath, `project_${m.project_id ?? projectId}/thumbs`).then(async (remoteUrl) => {
             if (remoteUrl) {
               m.thumb_path = remoteUrl;
               if (auth.user || !db.isTauri()) {
@@ -113,7 +113,7 @@ export async function addPaths(projectId, kind, paths, targetAlbum = null) {
       try {
         const row = await sync.syncCreateMedia({ project_id: projectId, kind, path, title, album: targetAlbum });
         item.id = row.id;
-      } catch (e) { console.warn(e.message); }
+      } catch (e) { syncError(e, "Ajout de média"); }
     }
     // SQLite local
     if (!item.id && db.isTauri()) {
@@ -143,7 +143,7 @@ export async function addPaths(projectId, kind, paths, targetAlbum = null) {
         }
         
         // Upload miniature R2
-        uploadToR2(thumbPath, `thumbs`).then(async (remoteThumbUrl) => {
+        uploadToR2(thumbPath, `project_${projectId}/thumbs`).then(async (remoteThumbUrl) => {
           if (remoteThumbUrl) {
             item.thumb_path = remoteThumbUrl;
             if (auth.user || !db.isTauri()) {
@@ -167,7 +167,7 @@ export async function setBefore(item) {
   if (!path) return;
   item.before_path = path;
   if (auth.user || !db.isTauri()) {
-    try { await sync.syncUpdateMedia(item.id, { before_path: path }); } catch (e) { console.warn(e.message); }
+    try { await sync.syncUpdateMedia(item.id, { before_path: path }); } catch (e) { syncError(e, "Photo avant/après"); }
   }
   if (db.isTauri()) await db.setMediaBefore(item.id, path);
 }
@@ -175,7 +175,7 @@ export async function setBefore(item) {
 export async function clearBefore(item) {
   item.before_path = null;
   if (auth.user || !db.isTauri()) {
-    try { await sync.syncUpdateMedia(item.id, { before_path: null }); } catch (e) { console.warn(e.message); }
+    try { await sync.syncUpdateMedia(item.id, { before_path: null }); } catch (e) { syncError(e, "Photo avant/après"); }
   }
   if (db.isTauri()) await db.setMediaBefore(item.id, null);
 }
@@ -183,7 +183,8 @@ export async function clearBefore(item) {
 export async function toggleFavorite(item) {
   item.starred = item.starred ? 0 : 1;
   if (auth.user || !db.isTauri()) {
-    try { await sync.syncUpdateMedia(item.id, { starred: !!item.starred }); } catch (e) { console.warn(e.message); }
+    // RPC : le client ne peut toucher que starred (RLS owner-only sur le reste)
+    try { await sync.syncSetMediaStarred(item.id, !!item.starred); } catch (e) { syncError(e, "Favori"); }
   }
   if (db.isTauri()) await db.setMediaFavorite(item.id, item.starred);
 }
@@ -191,7 +192,8 @@ export async function toggleFavorite(item) {
 export async function setApproval(item, approval) {
   item.approval = item.approval === approval ? null : approval;
   if (auth.user || !db.isTauri()) {
-    try { await sync.syncUpdateMedia(item.id, { approval: item.approval }); } catch (e) { console.warn(e.message); }
+    // RPC : le client ne peut toucher que approval (RLS owner-only sur le reste)
+    try { await sync.syncSetMediaApproval(item.id, item.approval); } catch (e) { syncError(e, "Approbation"); }
   }
   if (db.isTauri()) await db.setMediaApproval(item.id, item.approval);
 }
@@ -199,7 +201,7 @@ export async function setApproval(item, approval) {
 export async function setTitle(item, title) {
   item.title = title;
   if (auth.user || !db.isTauri()) {
-    try { await sync.syncUpdateMedia(item.id, { title }); } catch (e) { console.warn(e.message); }
+    try { await sync.syncUpdateMedia(item.id, { title }); } catch (e) { syncError(e, "Titre"); }
   }
   if (db.isTauri()) await db.setMediaTitle(item.id, title);
 }
@@ -207,7 +209,7 @@ export async function setTitle(item, title) {
 export async function setAlbum(item, album) {
   item.album = album?.trim() || null;
   if (auth.user || !db.isTauri()) {
-    try { await sync.syncUpdateMedia(item.id, { album: item.album }); } catch (e) { console.warn(e.message); }
+    try { await sync.syncUpdateMedia(item.id, { album: item.album }); } catch (e) { syncError(e, "Album"); }
   }
   if (db.isTauri()) await db.setMediaAlbum(item.id, item.album);
 }
@@ -215,7 +217,7 @@ export async function setAlbum(item, album) {
 export async function setInDelivery(item, value) {
   item.in_delivery = value ? 1 : 0;
   if (auth.user || !db.isTauri()) {
-    try { await sync.syncUpdateMedia(item.id, { in_delivery: item.in_delivery }); } catch (e) { console.warn(e.message); }
+    try { await sync.syncUpdateMedia(item.id, { in_delivery: item.in_delivery }); } catch (e) { syncError(e, "Sélection de livraison"); }
   }
   if (db.isTauri()) await db.setMediaInDelivery(item.id, item.in_delivery);
 }
@@ -229,7 +231,7 @@ export async function removeMedia(projectId, kind, item) {
   if (item.thumb_path && item.thumb_path.startsWith("http")) deleteFromR2(item.thumb_path);
 
   if (auth.user || !db.isTauri()) {
-    try { await sync.syncDeleteMedia(item.id); } catch (e) { console.warn(e.message); }
+    try { await sync.syncDeleteMedia(item.id); } catch (e) { syncError(e, "Suppression de média"); }
   }
   if (db.isTauri()) await db.deleteMedia(item.id);
 }

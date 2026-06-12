@@ -6,6 +6,7 @@ import AppSidebar from "./components/AppSidebar.vue";
 import { setScreenProtection } from "./services/screenGuard";
 import { session, ROLES } from "./store/session";
 import Toaster from "./components/Toaster.vue";
+import ConfirmDialog from "./components/ConfirmDialog.vue";
 
 const route = useRoute();
 const isAuthPage = computed(() => route.name === "auth");
@@ -46,5 +47,6 @@ function onLeave(el, done) {
       </router-view>
     </main>
     <Toaster />
+    <ConfirmDialog />
   </div>
 </template>

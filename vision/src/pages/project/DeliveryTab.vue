@@ -30,6 +30,8 @@ function seenKey() {
   return `vision_delivery_seen_${projectId.value}`;
 }
 
+let countingUp = false;
+
 async function maybeAnimateHero() {
   if (!released.value || can.uploadMedia.value || !deliverables.value.length) return;
   await nextTick();
@@ -38,12 +40,12 @@ async function maybeAnimateHero() {
   const firstTime = !localStorage.getItem(seenKey());
   localStorage.setItem(seenKey(), "1");
 
-  const counter = { n: firstTime ? 0 : deliverables.value.length };
-  displayCount.value = counter.n;
-
   const tl = gsap.timeline({ defaults: { ease: "power3.out" } });
 
   if (firstTime) {
+    countingUp = true;
+    const counter = { n: 0 };
+    displayCount.value = 0;
     tl.fromTo(heroRef.value,
       { autoAlpha: 0, y: 32, scale: 0.96 },
       { autoAlpha: 1, y: 0, scale: 1, duration: 0.55 }
@@ -53,9 +55,12 @@ async function maybeAnimateHero() {
       ease: "power2.out",
       snap: { n: 1 },
       onUpdate: () => { displayCount.value = Math.round(counter.n); },
+      onComplete: () => {
+        countingUp = false;
+        displayCount.value = deliverables.value.length;
+      },
     }, "<0.15");
   } else {
-    displayCount.value = deliverables.value.length;
     tl.fromTo(heroRef.value,
       { autoAlpha: 0, y: 8 },
       { autoAlpha: 1, y: 0, duration: 0.3 }
@@ -92,18 +97,37 @@ const approved = computed(
 // Le créatif a remis les fichiers (acte distinct de la validation)
 const released = computed(() => project.value?.status === STATUS.DELIVERED);
 
+// Le compteur suit toujours la réalité (les updates realtime arrivent
+// photo par photo) ; il n'est figé que pendant l'animation de décompte.
+watch(
+  () => deliverables.value.length,
+  (n) => { if (!countingUp) displayCount.value = n; },
+  { immediate: true }
+);
+
 // Téléchargement : le créatif accède toujours à ses fichiers ; le client
 // seulement après remise officielle.
 const canDownload = computed(() => can.uploadMedia.value || released.value);
 
-// Déclenche une seule fois quand les données sont prêtes (doit être après les computeds)
-const unwatch = watch(
+// Déclenche une seule fois quand les données sont prêtes.
+// NB : avec immediate:true le callback peut s'exécuter avant que watch()
+// ait renvoyé la fonction stop — d'où le flag + l'arrêt différé.
+let heroFired = false;
+let stopHeroWatch = null;
+stopHeroWatch = watch(
   () => released.value && deliverables.value.length > 0 && !can.uploadMedia.value,
-  (ready) => { if (ready) { unwatch(); maybeAnimateHero(); } },
+  (ready) => {
+    if (ready && !heroFired) {
+      heroFired = true;
+      stopHeroWatch?.();
+      maybeAnimateHero();
+    }
+  },
   { immediate: true }
 );
+if (heroFired) stopHeroWatch();
 
-onUnmounted(() => unwatch());
+onUnmounted(() => stopHeroWatch?.());
 
 async function downloadEverything() {
   busyAll.value = true;
@@ -120,6 +144,9 @@ async function download(m) {
   try {
     const dest = await downloadFile(m.path);
     if (dest) justSaved.value = m.id;
+  } catch (e) {
+    console.error("Échec téléchargement:", e);
+    toast("Téléchargement échoué. Réessayez.", "error");
   } finally {
     busyId.value = null;
   }

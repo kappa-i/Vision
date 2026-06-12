@@ -2,6 +2,7 @@ import { reactive } from "vue";
 import * as db from "../services/db";
 import * as sync from "../services/sync";
 import { auth } from "../services/auth";
+import { syncError } from "./toast";
 
 /**
  * Commentaires / feedback — persistés sur Supabase (cloud) + SQLite (cache local).
@@ -64,7 +65,7 @@ export async function addComment(projectId, author, body) {
     try {
       const row = await sync.syncCreateComment({ project_id: projectId, media_id: null, author, body: trimmed });
       optimistic.id = row.id;
-    } catch (e) { console.warn(e.message); }
+    } catch (e) { syncError(e, "Commentaire"); }
   }
   if (!optimistic.id && db.isTauri()) {
     optimistic.id = await db.addComment({ projectId, author, body: trimmed });
@@ -115,7 +116,7 @@ export async function addImageComment(projectId, mediaId, author, body, x = null
     try {
       const row = await sync.syncCreateComment({ project_id: projectId, media_id: mediaId, author, body: trimmed, x, y });
       c.id = row.id;
-    } catch (e) { console.warn(e.message); }
+    } catch (e) { syncError(e, "Annotation"); }
   }
   if (!c.id && db.isTauri()) {
     c.id = await db.addComment({ projectId, author, body: trimmed, mediaId, x, y });
@@ -132,7 +133,7 @@ export async function addImageComment(projectId, mediaId, author, body, x = null
 export async function removeComment(projectId, id) {
   state.byProject[projectId] = (state.byProject[projectId] || []).filter((c) => c.id !== id);
   if (auth.user || !db.isTauri()) {
-    try { await sync.syncDeleteComment(id); } catch (e) { console.warn(e.message); }
+    try { await sync.syncDeleteComment(id); } catch (e) { syncError(e, "Suppression de commentaire"); }
   }
   if (db.isTauri()) await db.deleteComment(id);
 }
@@ -140,7 +141,7 @@ export async function removeComment(projectId, id) {
 export async function removeImageComment(mediaId, id) {
   state.byMedia[mediaId] = (state.byMedia[mediaId] || []).filter((c) => c.id !== id);
   if (auth.user || !db.isTauri()) {
-    try { await sync.syncDeleteComment(id); } catch (e) { console.warn(e.message); }
+    try { await sync.syncDeleteComment(id); } catch (e) { syncError(e, "Suppression d'annotation"); }
   }
   if (db.isTauri()) await db.deleteComment(id);
 }
@@ -148,7 +149,7 @@ export async function removeImageComment(mediaId, id) {
 export async function toggleResolved(mediaId, comment) {
   comment.resolved = comment.resolved ? 0 : 1;
   if (auth.user || !db.isTauri()) {
-    try { await sync.syncUpdateComment(comment.id, { resolved: !!comment.resolved }); } catch (e) { console.warn(e.message); }
+    try { await sync.syncUpdateComment(comment.id, { resolved: !!comment.resolved }); } catch (e) { syncError(e, "Résolution d'annotation"); }
   }
   if (db.isTauri()) await db.setCommentResolved(comment.id, comment.resolved);
 }

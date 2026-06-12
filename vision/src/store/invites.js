@@ -2,11 +2,13 @@ import { reactive } from "vue";
 import * as db from "../services/db";
 import * as sync from "../services/sync";
 import { auth } from "../services/auth";
+import { syncError } from "./toast";
 
 /**
  * Invitations client — persistées sur Supabase + SQLite local.
- * Le code d'invitation reste un code court lisible (6 chars).
- * Après rachat, on lie l'user à son projet via project_members.
+ * Le code court (6 chars) expire après 72 h et est à usage unique.
+ * Le rachat passe par la RPC `redeem_invite` (la table invites n'est
+ * pas lisible par les clients — anti-énumération).
  */
 const state = reactive({
   byProject: {},
@@ -15,6 +17,8 @@ const state = reactive({
 
 export const invites = state;
 
+const INVITE_TTL_HOURS = 72;
+
 export function invitesFor(projectId) {
   return state.byProject[projectId] || [];
 }
@@ -22,6 +26,11 @@ export function invitesFor(projectId) {
 export function activeInvite(projectId) {
   const list = state.byProject[projectId] || [];
   return list[0] || null;
+}
+
+export function isExpired(invite) {
+  if (!invite?.expires_at) return false;
+  return new Date(invite.expires_at).getTime() < Date.now();
 }
 
 function genCode() {
@@ -50,19 +59,26 @@ export async function loadInvites(projectId) {
 
 export async function createInvite(projectId, email = null) {
   const code = genCode();
+  const expiresAt = new Date(Date.now() + INVITE_TTL_HOURS * 3600 * 1000).toISOString();
   const invite = {
     project_id: projectId,
     code,
     email,
     created_at: nowStamp(),
     accepted_at: null,
+    expires_at: expiresAt,
   };
 
   if (auth.user || !db.isTauri()) {
     try {
-      const row = await sync.syncCreateInvite({ project_id: projectId, code, email });
+      const row = await sync.syncCreateInvite({
+        project_id: projectId,
+        code,
+        email,
+        expires_at: expiresAt,
+      });
       invite.id = row.id;
-    } catch (e) { console.warn(e.message); }
+    } catch (e) { syncError(e, "Invitation"); }
   }
   if (!invite.id && db.isTauri()) {
     invite.id = await db.createInvite({ projectId, code, email });
@@ -79,7 +95,7 @@ export async function createInvite(projectId, email = null) {
 export async function removeInvite(projectId, id) {
   state.byProject[projectId] = (state.byProject[projectId] || []).filter((i) => i.id !== id);
   if (auth.user || !db.isTauri()) {
-    try { await sync.syncDeleteInvite(id); } catch (e) { console.warn(e.message); }
+    try { await sync.syncDeleteInvite(id); } catch (e) { syncError(e, "Suppression d'invitation"); }
   }
   if (db.isTauri()) await db.deleteInvite(id);
 }
@@ -93,43 +109,31 @@ export async function regenerateInvite(projectId) {
 }
 
 /**
- * Recherche un code et le marque accepté.
- * Si l'user est connecté → lie son compte au projet via project_members.
+ * Rachat d'un code via la RPC serveur (validation existence + expiration +
+ * usage unique). Renvoie { ok, project_id } ou { ok: false, error }.
  */
 export async function redeemCode(rawCode) {
   const code = rawCode.trim().toUpperCase();
-  if (!code) return null;
+  if (!code) return { ok: false, error: "Entrez un code." };
 
-  // Supabase
-  if (auth.user || !db.isTauri()) {
+  // Supabase (chemin normal)
+  if (auth.user) {
     try {
-      const invite = await sync.syncFindInviteByCode(code);
-      if (!invite) return null;
-      if (!invite.accepted_at) {
-        await sync.syncAcceptInvite(invite.id);
-        invite.accepted_at = new Date().toISOString();
-      }
-      // Lie l'user au projet
-      await sync.syncAddProjectMember(invite.project_id, auth.user.id);
-      return invite;
-    } catch (e) { console.warn(e.message); }
-  }
-
-  // Fallback Tauri
-  if (db.isTauri()) {
-    const invite = await db.findInviteByCode(code);
-    if (!invite) return null;
-    if (!invite.accepted_at) await db.acceptInvite(invite.id, nowStamp());
-    return invite;
-  }
-
-  // Mode navigateur demo
-  for (const list of Object.values(state.byProject)) {
-    const found = list.find((i) => i.code === code);
-    if (found) {
-      found.accepted_at = found.accepted_at || nowStamp();
-      return found;
+      const res = await sync.syncRedeemInvite(code);
+      return res || { ok: false, error: "Code invalide ou introuvable." };
+    } catch (e) {
+      console.warn(e.message);
+      return { ok: false, error: "Erreur réseau, réessayez." };
     }
   }
-  return null;
+
+  // Fallback local (hors-ligne / démo)
+  if (db.isTauri()) {
+    const invite = await db.findInviteByCode(code);
+    if (!invite) return { ok: false, error: "Code invalide ou introuvable." };
+    if (!invite.accepted_at) await db.acceptInvite(invite.id, nowStamp());
+    return { ok: true, project_id: invite.project_id };
+  }
+
+  return { ok: false, error: "Code invalide ou introuvable." };
 }

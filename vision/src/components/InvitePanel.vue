@@ -5,6 +5,7 @@ import {
   loadInvites,
   createInvite,
   regenerateInvite,
+  isExpired,
 } from "../store/invites";
 
 const props = defineProps({
@@ -17,6 +18,15 @@ const copied = ref(false);
 onMounted(() => loadInvites(props.projectId));
 
 const invite = computed(() => activeInvite(props.projectId));
+
+const expiryLabel = computed(() => {
+  const inv = invite.value;
+  if (!inv || inv.accepted_at || !inv.expires_at) return null;
+  const ms = new Date(inv.expires_at).getTime() - Date.now();
+  if (ms <= 0) return "Expiré";
+  const hours = Math.ceil(ms / 3600000);
+  return hours >= 24 ? `Expire dans ${Math.ceil(hours / 24)} j` : `Expire dans ${hours} h`;
+});
 
 async function generate() {
   busy.value = true;
@@ -67,7 +77,14 @@ async function copy() {
         class="text-xs font-medium text-emerald-600"
         >Accepté ✓</span
       >
-      <span v-else class="text-[10px] uppercase tracking-widest font-semibold text-muted">En attente</span>
+      <span
+        v-else-if="isExpired(invite)"
+        class="text-[10px] uppercase tracking-widest font-semibold text-rose-500"
+        >Expiré, régénérez un code</span
+      >
+      <span v-else class="text-[10px] uppercase tracking-widest font-semibold text-muted">
+        En attente<template v-if="expiryLabel"> · {{ expiryLabel }}</template>
+      </span>
 
       <div class="ml-auto flex items-center gap-3">
         <button

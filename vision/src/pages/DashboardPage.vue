@@ -1,12 +1,14 @@
 <script setup>
-import { ref, reactive, computed, onMounted, onUnmounted } from "vue";
+import { ref, reactive, computed, onMounted, onUnmounted, nextTick } from "vue";
 import { useRouter } from "vue-router";
 import { gsap } from "gsap";
 import {
   projects,
   loadProjects,
+  refreshProjects,
   addProject,
   removeProject,
+  leaveProject,
   STATUS,
   STATUS_LABEL,
 } from "../store/projects";
@@ -19,7 +21,8 @@ import OnboardingTour from "../components/OnboardingTour.vue";
 import CreateProjectModal from "../components/CreateProjectModal.vue";
 import { shouldShow, startTour } from "../composables/useOnboarding";
 import { assetUrl } from "../services/files";
-import { FolderPlus, Trash2, Plus } from "lucide-vue-next";
+import { confirmDialog } from "../services/dialogs";
+import { FolderPlus, Trash2, Plus, LogOut } from "lucide-vue-next";
 
 const router = useRouter();
 const creating = ref(false);
@@ -50,17 +53,20 @@ onMounted(async () => {
   if (shouldShow("dashboard")) {
     setTimeout(() => startTour("dashboard"), 400);
   }
-  // Stagger d'entrée des cartes projet
-  ctx = gsap.context(() => {
-    gsap.from(".project-card", {
-      autoAlpha: 0,
-      y: 28,
-      duration: 0.5,
-      stagger: 0.07,
-      ease: "power3.out",
-      clearProps: "all",
-    });
-  }, container.value);
+  // Stagger d'entrée des cartes projet (seulement s'il y en a)
+  await nextTick();
+  if (container.value?.querySelector(".project-card")) {
+    ctx = gsap.context(() => {
+      gsap.from(".project-card", {
+        autoAlpha: 0,
+        y: 28,
+        duration: 0.5,
+        stagger: 0.07,
+        ease: "power3.out",
+        clearProps: "all",
+      });
+    }, container.value);
+  }
 });
 
 onUnmounted(() => {
@@ -75,15 +81,16 @@ async function handleCreate({ name, description }) {
 
 async function handleJoin() {
   joinError.value = "";
-  const invite = await redeemCode(codeInput.value);
-  if (!invite) {
-    joinError.value = "Code invalide ou introuvable.";
+  const res = await redeemCode(codeInput.value);
+  if (!res?.ok) {
+    joinError.value = res?.error || "Code invalide ou introuvable.";
     return;
   }
-  joinProjectAsClient(invite.project_id);
+  joinProjectAsClient(res.project_id);
   codeInput.value = "";
   joining.value = false;
-  router.push({ name: "about", params: { id: invite.project_id } });
+  await refreshProjects(); // le projet rejoint devient visible (RLS membre)
+  router.push({ name: "about", params: { id: res.project_id } });
 }
 
 const search = ref("");
@@ -147,11 +154,23 @@ function onCardLeave(e) {
 
 async function handleDelete(p) {
   if (
-    window.confirm(
-      `Supprimer « ${p.name} » et tout son contenu ? Cette action est définitive.`
+    await confirmDialog(
+      `Supprimer « ${p.name} » et tout son contenu ? Cette action est définitive.`,
+      { title: "Supprimer le projet", confirmLabel: "Supprimer" }
     )
   ) {
     await removeProject(p.id);
+  }
+}
+
+async function handleLeave(p) {
+  if (
+    await confirmDialog(
+      `Quitter « ${p.name} » ? Le projet reste chez le créatif. Il vous faudra une nouvelle invitation pour y accéder à nouveau.`,
+      { title: "Quitter le projet", confirmLabel: "Quitter" }
+    )
+  ) {
+    await leaveProject(p.id);
   }
 }
 </script>
@@ -255,7 +274,7 @@ async function handleDelete(p) {
             </span>
           </div>
           <button
-            v-if="can.createProject.value"
+            v-if="p.owner_id === auth.user?.id"
             type="button"
             title="Supprimer le projet"
             class="hidden transition group-hover:block"
@@ -263,6 +282,16 @@ async function handleDelete(p) {
             @click.stop="handleDelete(p)"
           >
             <Trash2 class="h-5 w-5" />
+          </button>
+          <button
+            v-else
+            type="button"
+            title="Quitter le projet (le projet original n'est pas supprimé)"
+            class="hidden transition group-hover:block"
+            :class="p.cover_path ? 'text-white/70 hover:text-rose-400' : 'text-muted hover:text-rose-500'"
+            @click.stop="handleLeave(p)"
+          >
+            <LogOut class="h-5 w-5" />
           </button>
         </div>
 

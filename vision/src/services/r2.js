@@ -1,106 +1,91 @@
 import { readFile } from "@tauri-apps/plugin-fs";
-import { S3Client, PutObjectCommand, DeleteObjectCommand, ListObjectsV2Command } from "@aws-sdk/client-s3";
+import { supabase } from "./supabase";
 import { basename } from "./files";
 
-const endpoint = import.meta.env.VITE_R2_ENDPOINT;
-const accessKeyId = import.meta.env.VITE_R2_ACCESS_KEY;
-const secretAccessKey = import.meta.env.VITE_R2_SECRET_KEY;
-const bucket = import.meta.env.VITE_R2_BUCKET;
-// Optionnel: URL publique si configurée dans Cloudflare (ex: https://pub-xxx.r2.dev)
-const publicDomain = import.meta.env.VITE_R2_PUBLIC_DOMAIN || "";
+/**
+ * Stockage médias Cloudflare R2 — via l'Edge Function `r2-sign`.
+ *
+ * Aucune clé R2 dans l'app : la fonction serveur vérifie l'identité
+ * (et la propriété du projet), puis délivre une URL d'upload présignée
+ * ou exécute la suppression elle-même.
+ *
+ * Tous les objets vivent sous `project_<id>/…` (originaux),
+ * `project_<id>/thumbs/…` et `project_<id>/covers/…` — ce qui permet
+ * de purger un projet entier avec un seul préfixe.
+ */
 
-let s3 = null;
-if (endpoint && accessKeyId) {
-  s3 = new S3Client({
-    region: "auto",
-    endpoint,
-    forcePathStyle: true,
-    credentials: {
-      accessKeyId,
-      secretAccessKey,
-    },
-  });
+async function signRequest(body) {
+  const { data, error } = await supabase.functions.invoke("r2-sign", { body });
+  if (error) throw error;
+  if (data?.error) throw new Error(data.error);
+  return data;
 }
 
-export async function uploadToR2(localPath, folder = "media") {
-  if (!s3 || !localPath) return null;
+function contentTypeFor(fileName) {
+  const lower = fileName.toLowerCase();
+  if (lower.endsWith(".png")) return "image/png";
+  if (lower.endsWith(".webp")) return "image/webp";
+  if (lower.endsWith(".gif")) return "image/gif";
+  if (lower.endsWith(".avif")) return "image/avif";
+  if (lower.endsWith(".bmp")) return "image/bmp";
+  return "image/jpeg";
+}
+
+/**
+ * Upload d'un fichier local vers R2.
+ * `folder` doit être `project_<id>`, `project_<id>/thumbs` ou `project_<id>/covers`.
+ * Renvoie l'URL publique, ou null en cas d'échec.
+ */
+export async function uploadToR2(localPath, folder) {
+  if (!localPath || !folder) return null;
   if (/^https?:\/\//.test(localPath)) return null;
 
   try {
-    const fileData = await readFile(localPath);
-    const fileName = `${Date.now()}-${basename(localPath).replace(/[^a-zA-Z0-9.-]/g, "_")}`;
-    const key = `${folder}/${fileName}`;
+    const fileName = basename(localPath);
+    const contentType = contentTypeFor(fileName);
 
-    let contentType = "image/jpeg";
-    if (fileName.toLowerCase().endsWith(".png")) contentType = "image/png";
-    if (fileName.toLowerCase().endsWith(".webp")) contentType = "image/webp";
-    if (fileName.toLowerCase().endsWith(".gif")) contentType = "image/gif";
-
-    const command = new PutObjectCommand({
-      Bucket: bucket,
-      Key: key,
-      Body: fileData,
-      ContentType: contentType,
+    const { uploadUrl, publicUrl } = await signRequest({
+      action: "upload-url",
+      folder,
+      filename: fileName,
+      contentType,
     });
 
-    await s3.send(command);
-    
-    // Si on a un domaine public configuré, on retourne l'URL directe,
-    // sinon on retourne l'URL endpoint (qui nécessitera des permissions)
-    if (publicDomain) {
-      return `${publicDomain}/${key}`;
-    }
-    
-    // Fallback: retourne une URL formatée (nécessitera un bucket public ou presigned URL)
-    return `https://${bucket}.${new URL(endpoint).host}/${key}`;
+    const fileData = await readFile(localPath);
+    const res = await fetch(uploadUrl, {
+      method: "PUT",
+      body: fileData,
+      headers: { "Content-Type": contentType },
+    });
+    if (!res.ok) throw new Error(`Upload R2 refusé (HTTP ${res.status})`);
 
+    return publicUrl;
   } catch (error) {
     console.error("Erreur upload R2:", error);
     return null;
   }
 }
 
+/** Supprime un objet R2 à partir de son URL. */
 export async function deleteFromR2(url) {
-  if (!s3 || !url || !url.startsWith("http")) return false;
-
+  if (!url || !url.startsWith("http")) return false;
   try {
-    // Extraire la clé (le chemin après le domaine)
-    let key = "";
-    if (publicDomain && url.startsWith(publicDomain)) {
-      key = url.replace(`${publicDomain}/`, "");
-    } else {
-      const urlObj = new URL(url);
-      key = urlObj.pathname.substring(1); // Enlever le premier '/'
-    }
-
-    if (!key) return false;
-
-    const command = new DeleteObjectCommand({
-      Bucket: bucket,
-      Key: key,
-    });
-
-    await s3.send(command);
-    return true;
+    const { ok } = await signRequest({ action: "delete", url });
+    return !!ok;
   } catch (error) {
     console.error("Erreur suppression R2:", error);
     return false;
   }
 }
 
+/** Supprime tous les objets d'un projet (préfixe `project_<id>/`). */
 export async function deleteFolderFromR2(folderPrefix) {
-  if (!s3 || !folderPrefix) return false;
+  if (!folderPrefix) return false;
   try {
-    const listCmd = new ListObjectsV2Command({ Bucket: bucket, Prefix: folderPrefix });
-    const listRes = await s3.send(listCmd);
-    if (!listRes.Contents || listRes.Contents.length === 0) return true;
-
-    for (const item of listRes.Contents) {
-      await s3.send(new DeleteObjectCommand({ Bucket: bucket, Key: item.Key }));
-    }
-    return true;
-  } catch (e) {
-    console.error("Erreur suppression dossier R2:", e);
+    const { ok } = await signRequest({ action: "delete-folder", prefix: folderPrefix });
+    return !!ok;
+  } catch (error) {
+    console.error("Erreur suppression dossier R2:", error);
     return false;
   }
 }

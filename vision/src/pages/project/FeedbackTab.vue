@@ -23,6 +23,7 @@ const threadRef = ref(null);
 onMounted(() => {
   loadComments(projectId.value).then(() => {
     nextTick(() => {
+      if (!document.querySelector(".feedback-message")) return;
       gsap.from(".feedback-message", {
         y: 20,
         opacity: 0,

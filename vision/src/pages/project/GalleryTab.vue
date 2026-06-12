@@ -13,6 +13,7 @@ import {
   setTitle,
 } from "../../store/media";
 import { assetUrl } from "../../services/files";
+import { confirmDialog } from "../../services/dialogs";
 import { can } from "../../store/session";
 import { projects, loadProjects, findProject, STATUS } from "../../store/projects";
 import { useRouter } from "vue-router";
@@ -115,8 +116,8 @@ function attachBefore(m) {
   setBefore(m);
 }
 
-function confirmRemove(m) {
-  if (window.confirm(`Retirer « ${m.title} » ?`)) {
+async function confirmRemove(m) {
+  if (await confirmDialog(`Retirer « ${m.title} » ?`, { title: "Retirer la photo", confirmLabel: "Retirer" })) {
     removeMedia(projectId.value, KIND, m);
   }
 }
@@ -400,7 +401,7 @@ const { isDragging } = useFileDrop((paths) => {
 
     <!-- CTA : toutes les photos jugées, validation pas encore faite -->
     <div
-      v-if="isComplete && !isValidated"
+      v-if="showValidateCta"
       class="mt-8 flex items-center justify-between border-4 border-emerald-900/50 bg-emerald-950/40 p-6"
     >
       <p class="flex items-center text-lg font-bold tracking-tight text-emerald-400">
