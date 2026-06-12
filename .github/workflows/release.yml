@@ -58,14 +58,11 @@ jobs:
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # Signature/notarisation Apple : ignorés tant que les secrets ne sont pas définis.
-          # À configurer avec un compte Apple Developer pour supprimer l'avertissement Gatekeeper.
-          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
-          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          # Signature/notarisation Apple : quand tu auras un compte Apple Developer,
+          # ajoute ici les env APPLE_CERTIFICATE, APPLE_CERTIFICATE_PASSWORD,
+          # APPLE_SIGNING_IDENTITY, APPLE_ID, APPLE_PASSWORD, APPLE_TEAM_ID
+          # (ne PAS les ajouter tant que les secrets n'existent pas : une valeur
+          # vide fait échouer le codesign du build macOS).
         with:
           projectPath: ./vision
           args: ${{ matrix.args }}
