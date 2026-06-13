@@ -46,6 +46,20 @@ export function assetUrl(path) {
   return convertFileSrc(path);
 }
 
+/**
+ * URL d'affichage d'une miniature, robuste entre machines.
+ * Un thumb_path LOCAL généré sur une autre machine ne résout pas ici
+ * (chemin Windows affiché sur Mac, etc.) : on privilégie toujours une URL
+ * cloud (miniature R2, sinon image R2). On ne tombe sur le chemin local
+ * que s'il n'existe aucune URL cloud (cas hors-ligne / mono-machine).
+ */
+export function thumbUrl(m) {
+  if (!m) return "";
+  if (m.thumb_path && /^https?:\/\//.test(m.thumb_path)) return m.thumb_path;
+  if (m.path && /^https?:\/\//.test(m.path)) return m.path;
+  return assetUrl(m.thumb_path || m.path);
+}
+
 export function basename(path) {
   if (!path) return "";
   return path.split(/[\\/]/).pop();

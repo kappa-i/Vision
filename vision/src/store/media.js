@@ -69,10 +69,9 @@ function _generateMissingThumbs(items, projectId) {
         if (thumbPath) {
           db.setMediaThumb(m.id, thumbPath);
           m.thumb_path = thumbPath;
-          if (auth.user || !db.isTauri()) {
-            try { await sync.syncUpdateMedia(m.id, { thumb_path: thumbPath }); } catch {}
-          }
-          // Upload R2 en arrière-plan
+          // NB : on NE synchronise PAS le chemin local vers Supabase
+          // (il ne résoudrait pas sur une autre machine). Seule l'URL R2
+          // ci-dessous est poussée au cloud.
           uploadToR2(thumbPath, `project_${m.project_id ?? projectId}/thumbs`).then(async (remoteUrl) => {
             if (remoteUrl) {
               m.thumb_path = remoteUrl;
@@ -138,10 +137,9 @@ export async function addPaths(projectId, kind, paths, targetAlbum = null) {
       if (thumbPath) {
         if (db.isTauri()) db.setMediaThumb(item.id, thumbPath);
         item.thumb_path = thumbPath;
-        if (auth.user || !db.isTauri()) {
-          try { await sync.syncUpdateMedia(item.id, { thumb_path: thumbPath }); } catch {}
-        }
-        
+        // Affichage local instantané uniquement ; on ne pousse au cloud que
+        // l'URL R2 (un chemin local ne résout pas sur une autre machine).
+
         // Upload miniature R2
         uploadToR2(thumbPath, `project_${projectId}/thumbs`).then(async (remoteThumbUrl) => {
           if (remoteThumbUrl) {

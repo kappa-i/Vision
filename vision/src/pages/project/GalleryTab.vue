@@ -12,7 +12,7 @@ import {
   toggleFavorite,
   setTitle,
 } from "../../store/media";
-import { assetUrl } from "../../services/files";
+import { assetUrl, thumbUrl } from "../../services/files";
 import { confirmDialog } from "../../services/dialogs";
 import { can } from "../../store/session";
 import { projects, loadProjects, findProject, STATUS } from "../../store/projects";
@@ -246,8 +246,8 @@ const { isDragging } = useFileDrop((paths) => {
             }"
           >
             <img
-              v-if="m.thumb_path"
-              :src="assetUrl(m.thumb_path)"
+              v-if="thumbUrl(m)"
+              :src="thumbUrl(m)"
               :alt="m.title || ''"
               :draggable="false"
               loading="lazy"

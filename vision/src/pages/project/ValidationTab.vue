@@ -9,7 +9,7 @@ import {
   decide,
 } from "../../store/validations";
 import { mediaFor, loadMedia } from "../../store/media";
-import { assetUrl } from "../../services/files";
+import { assetUrl, thumbUrl } from "../../services/files";
 import { can } from "../../store/session";
 
 const route = useRoute();
@@ -169,7 +169,7 @@ function formatDate(s) {
               @click="goGallery"
             >
               <img
-                :src="assetUrl(m.thumb_path || m.path)"
+                :src="thumbUrl(m)"
                 :alt="m.title || ''"
                 :draggable="false"
                 loading="lazy"

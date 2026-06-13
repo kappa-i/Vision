@@ -187,19 +187,19 @@ export async function setCover(id) {
     if (auth.user) {
       toast("Envoi vers le cloud...", "info");
       const cloudUrl = await uploadToR2(thumbPath, `project_${id}/covers`);
-      
-      // 5. Mise à jour Supabase via syncUpdateProject (avec try/catch interne pour ignorer RLS)
-      const finalPath = cloudUrl || thumbPath; 
-      
-      try {
-        await sync.syncUpdateProject(id, { cover_path: finalPath });
-        if (cloudUrl) {
-          // Si réussi, on garde l'URL cloud en local
-          p.cover_path = cloudUrl;
+
+      // 5. On ne pousse au cloud QUE l'URL R2 : un chemin local ne résoudrait
+      // pas sur la machine du client (couverture cassée). Sans URL cloud,
+      // la couverture reste visible localement mais n'est pas partagée.
+      if (cloudUrl) {
+        p.cover_path = cloudUrl;
+        try {
+          await sync.syncUpdateProject(id, { cover_path: cloudUrl });
+        } catch (err) {
+          console.warn("Supabase update refusé (RLS?) :", err.message);
         }
-      } catch (err) {
-        console.warn("Supabase update refusé (RLS?) :", err.message);
-        // L'image reste visible localement, on ignore l'erreur
+      } else {
+        toast("Couverture enregistrée en local (envoi cloud indisponible).", "info");
       }
     }
     

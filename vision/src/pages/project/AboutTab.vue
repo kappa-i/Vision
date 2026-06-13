@@ -17,7 +17,7 @@ import {
   unresolvedFor,
   loadUnresolvedAnnotations,
 } from "../../store/comments";
-import { assetUrl } from "../../services/files";
+import { assetUrl, thumbUrl } from "../../services/files";
 import { can } from "../../store/session";
 import { useRouter } from "vue-router";
 import { Check, ArrowRight, MessageCircle, Image as ImageIcon } from "lucide-vue-next";
@@ -248,7 +248,7 @@ function formatDate(s) {
                :title="r.title"
                @click="router.push({ name: 'gallery', params: { id: projectId } })"
              >
-               <img v-if="r.thumb_path" :src="assetUrl(r.thumb_path)" class="h-10 w-10 object-cover" />
+               <img v-if="thumbUrl(r)" :src="thumbUrl(r)" class="h-10 w-10 object-cover" />
                <div v-else class="h-10 w-10 bg-white/10" />
                <span class="absolute bottom-0 right-0 bg-amber-500 px-1.5 py-0.5 text-[9px] font-bold text-black">{{ r.count }}</span>
              </button>

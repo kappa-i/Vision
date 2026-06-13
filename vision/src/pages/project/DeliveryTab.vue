@@ -11,7 +11,7 @@ import {
   projects,
   STATUS,
 } from "../../store/projects";
-import { assetUrl, basename, downloadFile, downloadAll } from "../../services/files";
+import { assetUrl, thumbUrl, basename, downloadFile, downloadAll } from "../../services/files";
 import { setInDelivery } from "../../store/media";
 import { can } from "../../store/session";
 import { toast } from "../../store/toast";
@@ -284,7 +284,7 @@ function release() {
               @click="setInDelivery(m, !m.in_delivery)"
             >
               <img
-                :src="assetUrl(m.thumb_path || m.path)"
+                :src="thumbUrl(m)"
                 :alt="m.title || ''"
                 :draggable="false"
                 loading="lazy"
@@ -378,7 +378,7 @@ function release() {
               <!-- Image + overlay dans leur propre conteneur -->
               <div class="relative aspect-square overflow-hidden border border-line/30 bg-surface">
                 <img
-                  :src="assetUrl(m.thumb_path || m.path)"
+                  :src="thumbUrl(m)"
                   :alt="m.title || ''"
                   :draggable="false"
                   loading="lazy"
