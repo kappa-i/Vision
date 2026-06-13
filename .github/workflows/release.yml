@@ -1,13 +1,17 @@
 name: Release
+# Déclenchement MANUEL uniquement (onglet Actions → "Release" → "Run workflow").
+# Les pushes ne lancent plus de build : on évite de produire une release à
+# chaque commit pendant le développement.
+# Pour relancer les builds automatiques sur push, décommenter le bloc ci-dessous.
 on:
-  push:
-    branches:
-      - main
-      - master
-    # La doc seule ne déclenche pas de build (gagne du temps de CI)
-    paths-ignore:
-      - '**/*.md'
-      - 'vision/docs/**'
+  workflow_dispatch:
+  # push:
+  #   branches:
+  #     - main
+  #     - master
+  #   paths-ignore:
+  #     - '**/*.md'
+  #     - 'vision/docs/**'
 
 permissions:
   contents: write
