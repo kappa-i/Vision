@@ -32,7 +32,28 @@ async fn generate_thumb(app: tauri::AppHandle, path: String) -> Result<String, S
         if thumb_path.exists() {
             return Ok(thumb_path.to_string_lossy().to_string());
         }
-        let img = image::open(&path).map_err(|e| e.to_string())?;
+
+        // Charge en respectant l'orientation EXIF. Les photos portrait du
+        // téléphone sont stockées en paysage + un drapeau de rotation que le
+        // navigateur applique mais que `image::open` ignore : sans ça, la
+        // miniature (et donc la couverture) sortirait tournée en paysage.
+        use image::ImageDecoder;
+        let img = match image::ImageReader::open(&path)
+            .map_err(|e| e.to_string())
+            .and_then(|r| r.with_guessed_format().map_err(|e| e.to_string()))
+            .and_then(|r| r.into_decoder().map_err(|e| e.to_string()))
+        {
+            Ok(mut decoder) => {
+                let orientation = decoder
+                    .orientation()
+                    .unwrap_or(image::metadata::Orientation::NoTransforms);
+                let mut im =
+                    image::DynamicImage::from_decoder(decoder).map_err(|e| e.to_string())?;
+                im.apply_orientation(orientation);
+                im
+            }
+            Err(_) => image::open(&path).map_err(|e| e.to_string())?,
+        };
         let thumb = img.thumbnail(500, 500);
         thumb
             .save_with_format(&thumb_path, image::ImageFormat::Jpeg)
