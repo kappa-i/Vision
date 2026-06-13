@@ -4,6 +4,10 @@ on:
     branches:
       - main
       - master
+    # La doc seule ne déclenche pas de build (gagne du temps de CI)
+    paths-ignore:
+      - '**/*.md'
+      - 'vision/docs/**'
 
 permissions:
   contents: write
