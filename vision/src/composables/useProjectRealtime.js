@@ -1,8 +1,8 @@
 import { onMounted, onUnmounted } from "vue";
 import { subscribeToProject } from "../services/sync";
 import { refreshProjects } from "../store/projects";
-import { realtimeInsertComment } from "../store/comments";
-import { realtimeInsertMedia, realtimeUpdateMedia } from "../store/media";
+import { realtimeInsertComment, realtimeUpdateComment, realtimeDeleteComment } from "../store/comments";
+import { realtimeInsertMedia, realtimeUpdateMedia, realtimeDeleteMedia } from "../store/media";
 import { realtimeInsertValidation } from "../store/validations";
 import { realtimeUpdateStage } from "../store/stages";
 
@@ -23,14 +23,15 @@ export function useProjectRealtime(projectId) {
           refreshProjects();
         }
       },
-      onComment: ({ eventType, new: row }) => {
-        if (eventType === "INSERT" && row) {
-          realtimeInsertComment(row);
-        }
+      onComment: ({ eventType, new: row, old }) => {
+        if (eventType === "INSERT" && row) realtimeInsertComment(row);
+        else if (eventType === "UPDATE" && row) realtimeUpdateComment(row);
+        else if (eventType === "DELETE" && old) realtimeDeleteComment(old);
       },
-      onMedia: ({ eventType, new: row }) => {
+      onMedia: ({ eventType, new: row, old }) => {
         if (eventType === "INSERT" && row) realtimeInsertMedia(row);
-        if (eventType === "UPDATE" && row) realtimeUpdateMedia(row);
+        else if (eventType === "UPDATE" && row) realtimeUpdateMedia(row);
+        else if (eventType === "DELETE" && old) realtimeDeleteMedia(old);
       },
       onValidation: ({ eventType, new: row }) => {
         if (eventType === "INSERT" && row) realtimeInsertValidation(row);

@@ -175,3 +175,24 @@ export function realtimeInsertComment(row) {
     if (!exists) state.byProject[row.project_id].push(row);
   }
 }
+
+/** Met à jour un commentaire reçu via Realtime (ex. passage en « résolu »). */
+export function realtimeUpdateComment(row) {
+  const list = row.media_id ? state.byMedia[row.media_id] : state.byProject[row.project_id];
+  if (!list) return;
+  const c = list.find((x) => x.id === row.id);
+  if (c) Object.assign(c, row);
+}
+
+/** Retire un commentaire supprimé sur une autre machine (Realtime DELETE). */
+export function realtimeDeleteComment(row) {
+  if (!row?.id) return;
+  // Le payload DELETE peut ne pas porter media_id/project_id : on retire par id
+  // dans les fils image ET projet.
+  for (const mid of Object.keys(state.byMedia)) {
+    state.byMedia[mid] = state.byMedia[mid].filter((c) => c.id !== row.id);
+  }
+  for (const pid of Object.keys(state.byProject)) {
+    state.byProject[pid] = state.byProject[pid].filter((c) => c.id !== row.id);
+  }
+}

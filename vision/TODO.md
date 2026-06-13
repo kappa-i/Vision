@@ -28,13 +28,15 @@ Roadmap issue de l'audit du 2026-06-12. Voir aussi la réflexion produit :
 
 - [x] **Livraison côté client** : `downloadFile`/`downloadAll` téléchargent
       les URLs R2 via fetch + `writeFile` (fait en avance le 2026-06-12)
-- [ ] Realtime : gérer les DELETE (média supprimé qui reste affiché chez le
-      client) et les UPDATE de commentaires
-- [ ] Rôle résolu **par projet** partout (plus de défaut global « créatif » ;
-      le client voit « Nouveau projet » sur le dashboard)
-- [ ] Nettoyage : données seed/picsum, store `stages` mort, orphelins R2
-      (`thumbs/` et `covers/` non purgés à la suppression d'un projet)
-- [ ] `deleteAccount` réel (RPC `delete_user` côté Supabase)
+- [x] Orphelins R2 purgés à la suppression (effet du passage à `project_<id>/`)
+- [x] Suppression de compte (OK confirmé le 2026-06-13)
+- [x] ~~Rôle par projet sur le dashboard~~ — non pertinent : le rôle est par
+      projet (résolu à l'ouverture + boutons supprimer/quitter des cartes) ;
+      « Nouveau projet » doit rester visible pour tous (chacun peut créer ses
+      propres projets)
+- [x] Realtime : DELETE (média + commentaire) et UPDATE commentaire gérés ;
+      `REPLICA IDENTITY FULL` sur media/comments (cf. phase0.sql) — 2026-06-13
+- [ ] Nettoyage code mort : données seed/picsum, store `stages` (Timeline retirée)
 
 ## 🟡 Phase 2 — Protection média (la vraie, remplace l'anti-screenshot seul)
 

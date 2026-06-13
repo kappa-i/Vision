@@ -368,3 +368,13 @@ begin
   end loop;
 end;
 $$;
+
+-- ============================================================
+-- Realtime DELETE : REPLICA IDENTITY FULL.
+-- Sans ça, un événement DELETE ne contient que la clé primaire dans `old`,
+-- donc le filtre `project_id=eq.X` côté client ne matche pas et la
+-- suppression n'est jamais reçue par l'autre machine. FULL inclut toutes
+-- les colonnes dans `old`.
+-- ============================================================
+alter table public.media    replica identity full;
+alter table public.comments replica identity full;

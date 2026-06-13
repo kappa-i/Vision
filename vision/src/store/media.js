@@ -250,6 +250,16 @@ export function realtimeUpdateMedia(row) {
   if (idx !== -1) Object.assign(state.items[k][idx], row);
 }
 
+/** Retire un média supprimé sur une autre machine (Realtime DELETE). */
+export function realtimeDeleteMedia(row) {
+  if (!row?.id) return;
+  // On retire par id dans toutes les listes du projet (le payload DELETE
+  // peut ne pas porter le `kind` selon la config de réplication).
+  for (const k of Object.keys(state.items)) {
+    state.items[k] = state.items[k].filter((m) => m.id !== row.id);
+  }
+}
+
 export async function reorderMedia(projectId, kind, mediaIds) {
   const k = key(projectId, kind);
   if (!state.items[k]) return;
