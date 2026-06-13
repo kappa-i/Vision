@@ -1,27 +1,34 @@
+use tauri::Manager;
 use tauri_plugin_sql::{Migration, MigrationKind};
 
 #[tauri::command]
-async fn generate_thumb(path: String) -> Result<String, String> {
+async fn generate_thumb(app: tauri::AppHandle, path: String) -> Result<String, String> {
+    // Les miniatures sont écrites dans le dossier cache de l'app, et NON à côté
+    // de l'image source : sur macOS, l'app n'a pas le droit de relire un fichier
+    // qu'elle a créé dans un dossier utilisateur protégé (TCC), ce qui faisait
+    // échouer leur upload R2. Son propre cache est toujours accessible.
+    let cache_dir = app.path().app_cache_dir().map_err(|e| e.to_string())?;
+
     tauri::async_runtime::spawn_blocking(move || {
+        use std::hash::{Hash, Hasher};
         use std::path::Path;
         let src = Path::new(&path);
-        let parent = src.parent().ok_or("no parent dir")?;
-        let stem = src
-            .file_stem()
-            .and_then(|s| s.to_str())
-            .ok_or("no file stem")?;
+        let stem = src.file_stem().and_then(|s| s.to_str()).unwrap_or("thumb");
 
         // Refuse les fichiers trop lourds pour éviter un OOM
-        let file_size = std::fs::metadata(&path)
-            .map(|m| m.len())
-            .unwrap_or(0);
+        let file_size = std::fs::metadata(&path).map(|m| m.len()).unwrap_or(0);
         if file_size > 200 * 1024 * 1024 {
             return Err("file too large (>200 MB)".to_string());
         }
 
-        let thumb_dir = parent.join(".vision_thumbs");
+        let thumb_dir = cache_dir.join("thumbs");
         std::fs::create_dir_all(&thumb_dir).map_err(|e| e.to_string())?;
-        let thumb_path = thumb_dir.join(format!("{}.jpg", stem));
+
+        // Nom unique dérivé du chemin source complet (évite les collisions de stem)
+        let mut hasher = std::collections::hash_map::DefaultHasher::new();
+        path.hash(&mut hasher);
+        let thumb_path = thumb_dir.join(format!("{:x}-{}.jpg", hasher.finish(), stem));
+
         if thumb_path.exists() {
             return Ok(thumb_path.to_string_lossy().to_string());
         }
