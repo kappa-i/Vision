@@ -4,7 +4,6 @@ import { refreshProjects } from "../store/projects";
 import { realtimeInsertComment, realtimeUpdateComment, realtimeDeleteComment } from "../store/comments";
 import { realtimeInsertMedia, realtimeUpdateMedia, realtimeDeleteMedia } from "../store/media";
 import { realtimeInsertValidation } from "../store/validations";
-import { realtimeUpdateStage } from "../store/stages";
 
 /**
  * Souscrit au canal Realtime d'un projet et met à jour les stores locaux
@@ -35,11 +34,6 @@ export function useProjectRealtime(projectId) {
       },
       onValidation: ({ eventType, new: row }) => {
         if (eventType === "INSERT" && row) realtimeInsertValidation(row);
-      },
-      onStage: ({ eventType, new: row }) => {
-        if ((eventType === "UPDATE" || eventType === "INSERT") && row) {
-          realtimeUpdateStage(row);
-        }
       },
     });
   });

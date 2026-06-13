@@ -18,19 +18,6 @@ const state = reactive({
 
 const key = (p, k) => `${p}:${k}`;
 
-const seed = {
-  "1:moodboard": [
-    { id: 1, path: "https://picsum.photos/seed/mood1/600", title: "Ambiance lumière", starred: 0 },
-    { id: 2, path: "https://picsum.photos/seed/mood2/600", title: "Palette chaude", starred: 0 },
-    { id: 3, path: "https://picsum.photos/seed/mood3/600", title: "Cadrage serré", starred: 0 },
-  ],
-  "1:gallery": [
-    { id: 11, path: "https://picsum.photos/seed/shot1/800/600", before_path: "https://picsum.photos/seed/shot1/800/600?grayscale", title: "Sélection 01", starred: 0 },
-    { id: 12, path: "https://picsum.photos/seed/shot2/800/600", before_path: null, title: "Sélection 02", starred: 1 },
-    { id: 13, path: "https://picsum.photos/seed/shot3/800/600", before_path: null, title: "Sélection 03", starred: 0 },
-  ],
-};
-
 export const media = state;
 
 export function mediaFor(projectId, kind) {
@@ -55,8 +42,6 @@ export async function loadMedia(projectId, kind) {
   if (db.isTauri()) {
     state.items[k] = await db.listMedia(projectId, kind);
     _generateMissingThumbs(state.items[k], projectId);
-  } else {
-    state.items[k] = [...(seed[k] || [])];
   }
   state.loaded[k] = true;
 }

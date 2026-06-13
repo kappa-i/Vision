@@ -272,59 +272,6 @@ export async function addValidation(projectId, decision) {
   return res.lastInsertId;
 }
 
-// --- Timeline : étapes du projet (MVP §7.2d) ---
-
-export async function listStages(projectId) {
-  const db = await getDb();
-  if (!db) return [];
-  return db.select(
-    "SELECT id, project_id, label, position, status, reached_at \
-     FROM stages WHERE project_id = $1 ORDER BY position ASC",
-    [projectId]
-  );
-}
-
-export async function insertStage({ projectId, label, position, status }) {
-  const db = await getDb();
-  if (!db) return null;
-  const res = await db.execute(
-    "INSERT INTO stages (project_id, label, position, status) \
-     VALUES ($1, $2, $3, $4)",
-    [projectId, label, position, status]
-  );
-  return res.lastInsertId;
-}
-
-export async function updateStage(id, status, reachedAt) {
-  const db = await getDb();
-  if (!db) return;
-  await db.execute(
-    "UPDATE stages SET status = $1, reached_at = $2 WHERE id = $3",
-    [status, reachedAt, id]
-  );
-}
-
-export async function updateStageLabel(id, label) {
-  const db = await getDb();
-  if (!db) return;
-  await db.execute("UPDATE stages SET label = $1 WHERE id = $2", [label, id]);
-}
-
-export async function setStageDate(id, reachedAt) {
-  const db = await getDb();
-  if (!db) return;
-  await db.execute("UPDATE stages SET reached_at = $1 WHERE id = $2", [
-    reachedAt,
-    id,
-  ]);
-}
-
-export async function deleteStage(id) {
-  const db = await getDb();
-  if (!db) return;
-  await db.execute("DELETE FROM stages WHERE id = $1", [id]);
-}
-
 // --- Invitations client (MVP §10.1, §6) ---
 
 export async function createInvite({ projectId, code, email = null }) {

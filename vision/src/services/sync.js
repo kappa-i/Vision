@@ -146,38 +146,6 @@ export async function syncCreateValidation(projectId, decision) {
   return data;
 }
 
-// --- Étapes ---
-
-export async function syncFetchStages(projectId) {
-  const { data, error } = await supabase
-    .from("stages")
-    .select("*")
-    .eq("project_id", projectId)
-    .order("position", { ascending: true });
-  if (error) throw error;
-  return data ?? [];
-}
-
-export async function syncCreateStage(fields) {
-  const { data, error } = await supabase
-    .from("stages")
-    .insert(fields)
-    .select("*")
-    .single();
-  if (error) throw error;
-  return data;
-}
-
-export async function syncUpdateStage(id, fields) {
-  const { error } = await supabase.from("stages").update(fields).eq("id", id);
-  if (error) throw error;
-}
-
-export async function syncDeleteStage(id) {
-  const { error } = await supabase.from("stages").delete().eq("id", id);
-  if (error) throw error;
-}
-
 // --- Invitations ---
 
 export async function syncFetchInvites(projectId) {
@@ -280,11 +248,6 @@ export function subscribeToProject(projectId, callbacks) {
       "postgres_changes",
       { event: "*", schema: "public", table: "validations", filter: `project_id=eq.${projectId}` },
       (payload) => callbacks.onValidation?.(payload)
-    )
-    .on(
-      "postgres_changes",
-      { event: "*", schema: "public", table: "stages", filter: `project_id=eq.${projectId}` },
-      (payload) => callbacks.onStage?.(payload)
     )
     .on(
       "postgres_changes",

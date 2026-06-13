@@ -36,7 +36,8 @@ Roadmap issue de l'audit du 2026-06-12. Voir aussi la réflexion produit :
       propres projets)
 - [x] Realtime : DELETE (média + commentaire) et UPDATE commentaire gérés ;
       `REPLICA IDENTITY FULL` sur media/comments (cf. phase0.sql) — 2026-06-13
-- [ ] Nettoyage code mort : données seed/picsum, store `stages` (Timeline retirée)
+- [x] Nettoyage code mort : seed/picsum supprimés, store `stages` + fonctions
+      db/sync/realtime retirés (Timeline abandonnée) — 2026-06-13
 
 ## 🟡 Phase 2 — Protection média (la vraie, remplace l'anti-screenshot seul)
 

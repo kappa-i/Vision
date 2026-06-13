@@ -30,18 +30,6 @@ const state = reactive({
   loaded: false,
 });
 
-const seed = [
-  {
-    id: 1,
-    name: "Campagne Été — Maison Lemaire",
-    status: STATUS.DRAFT,
-    description:
-      "Campagne photo lifestyle pour la collection été. Ambiance solaire, tons chauds, 12 visuels retenus pour le web et l'affichage.",
-  },
-  { id: 2, name: "Shooting produit — Atelier Nord", status: STATUS.DRAFT, description: null },
-  { id: 3, name: "Identité visuelle — Café Mire", status: STATUS.DELIVERED, description: null },
-];
-
 export const projects = state;
 
 export async function loadProjects() {
@@ -59,8 +47,6 @@ export async function loadProjects() {
   // Fallback : SQLite local
   if (db.isTauri()) {
     state.items = await db.listProjects();
-  } else if (!state.loaded) {
-    state.items = [...seed];
   }
   state.loaded = true;
 }

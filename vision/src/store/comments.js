@@ -19,13 +19,6 @@ function nowStamp() {
   return new Date().toISOString().slice(0, 19).replace("T", " ");
 }
 
-const seed = {
-  1: [
-    { id: 1, project_id: 1, media_id: null, author: "creatif", body: "Voici la direction artistique proposée pour la campagne été.", created_at: "2026-06-01 10:12:00" },
-    { id: 2, project_id: 1, media_id: null, author: "client", body: "J'adore l'ambiance. On peut réchauffer un peu les tons ?", created_at: "2026-06-01 14:30:00" },
-  ],
-};
-
 export const comments = state;
 
 export function commentsFor(projectId) {
@@ -43,8 +36,6 @@ export async function loadComments(projectId) {
   }
   if (db.isTauri()) {
     state.byProject[projectId] = await db.listComments(projectId);
-  } else {
-    state.byProject[projectId] = [...(seed[projectId] || [])];
   }
   state.loaded[projectId] = true;
 }
